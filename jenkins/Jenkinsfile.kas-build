@@ -23,16 +23,11 @@ pipeline {
         stage('Prepare') {
             steps {
                 script {
-                    env.BUILD_OUT_DIR = "${env.WORKSPACE}/build/${params.kas_file.replace('.yml', '')}"
-                }
-                withEnv([
-                    "CACHE_ROOT=${params.cache_root}",
-                    "BUILD_OUT_DIR=${env.BUILD_OUT_DIR}"
-                ]) {
-                sh '''#!/usr/bin/env bash
-                    set -euo pipefail
-                    mkdir -p "${CACHE_ROOT}/downloads" "${CACHE_ROOT}/sstate" "${BUILD_OUT_DIR}"
-                '''
+                    def buildOutDir = "${env.WORKSPACE}/build/${params.kas_file.replace('.yml', '')}"
+                    sh """#!/usr/bin/env bash
+set -euo pipefail
+mkdir -p "${params.cache_root}/downloads" "${params.cache_root}/sstate" "${buildOutDir}"
+"""
                 }
             }
         }
@@ -40,27 +35,19 @@ pipeline {
         stage('Build') {
             steps {
                 script {
-                    env.BUILD_OUT_DIR = "${env.WORKSPACE}/build/${params.kas_file.replace('.yml', '')}"
-                }
-                withEnv([
-                    "CACHE_ROOT=${params.cache_root}",
-                    "KAS_FILE=${params.kas_file}",
-                    "IMAGE=${params.image}",
-                    "BUILD_OUT_DIR=${env.BUILD_OUT_DIR}"
-                ]) {
-                sh '''#!/usr/bin/env bash
-                    set -euo pipefail
-                    docker run --rm \
-                        -v "${WORKSPACE}:/kas-work" \
-                        -v "${CACHE_ROOT}/downloads:/kas-work/downloads" \
-                        -v "${CACHE_ROOT}/sstate:/kas-work/sstate" \
-                        -e "DL_DIR=/kas-work/downloads" \
-                        -e "SSTATE_DIR=/kas-work/sstate" \
-                        -e "KAS_WORK_DIR=/kas-work" \
-                        -e "KAS_BUILD_DIR=/kas-work/build" \
-                        "${IMAGE}" \
-                        build "kas-configs/${KAS_FILE}"
-                '''
+                    sh """#!/usr/bin/env bash
+set -euo pipefail
+docker run --rm \\
+    -v "${env.WORKSPACE}:/kas-work" \\
+    -v "${params.cache_root}/downloads:/kas-work/downloads" \\
+    -v "${params.cache_root}/sstate:/kas-work/sstate" \\
+    -e "DL_DIR=/kas-work/downloads" \\
+    -e "SSTATE_DIR=/kas-work/sstate" \\
+    -e "KAS_WORK_DIR=/kas-work" \\
+    -e "KAS_BUILD_DIR=/kas-work/build" \\
+    "${params.image}" \\
+    build "kas-configs/${params.kas_file}"
+"""
                 }
             }
         }

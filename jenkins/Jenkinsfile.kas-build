@@ -15,12 +15,6 @@ pipeline {
         string(name: 'cache_root', defaultValue: '/data/yocto-cache', description: 'Host path for shared sstate/downloads')
     }
 
-    environment {
-        CACHE_ROOT = "${params.cache_root}"
-        KAS_FILE = "${params.kas_file}"
-        IMAGE = "${params.image}"
-    }
-
     options {
         timestamps()
     }
@@ -29,6 +23,9 @@ pipeline {
         stage('Prepare') {
             steps {
                 script {
+                    env.CACHE_ROOT = params.cache_root
+                    env.KAS_FILE = params.kas_file
+                    env.IMAGE = params.image
                     env.BUILD_OUT_DIR = "${env.WORKSPACE}/build/${params.kas_file.replace('.yml', '')}"
                 }
                 sh '''

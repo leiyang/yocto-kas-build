@@ -1,0 +1,27 @@
+# Simple bash-only build configuration.
+# This doesn't actually build Yocto - just runs a simple bash script
+# to demonstrate Jenkins pipeline functionality.
+header:
+  version: 14
+
+# Use a minimal machine configuration
+machine: qemux86-64
+distro: poky
+target: core-image-minimal
+
+repos:
+  poky:
+    url: https://git.yoctoproject.org/poky
+    branch: kirkstone
+    layers:
+      meta:
+      meta-poky:
+      meta-yocto-bsp:
+
+local_conf_header:
+  standard: |
+    PACKAGE_CLASSES = "package_ipk"
+    EXTRA_IMAGE_FEATURES = "debug-tweaks"
+  bash_only: |
+    # This is a bash-only test build
+    # Just echo some information and exit successfully

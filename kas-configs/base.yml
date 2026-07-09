@@ -1,0 +1,29 @@
+# Shared base included by other kas configs (e.g. raspberrypi4-64.yml).
+# Not meant to be built directly - it has no `machine:` set.
+# Demonstrates kas's `includes` merge model: this file defines the common
+# repos/target, and files that include it layer on machine/distro/extra repos.
+header:
+  version: 14
+
+distro: poky
+target: core-image-minimal
+
+repos:
+  poky:
+    url: https://git.yoctoproject.org/poky
+    branch: kirkstone
+    layers:
+      meta:
+      meta-poky:
+      meta-yocto-bsp:
+
+local_conf_header:
+  standard: |
+    PACKAGE_CLASSES = "package_ipk"
+    EXTRA_IMAGE_FEATURES = "debug-tweaks"
+  parallelism: |
+    # Cap bitbake's own internal parallelism at 2 (not Jenkins job
+    # concurrency) — keeps a single build from over-subscribing the host,
+    # especially when multiple Jenkins workers share this one machine.
+    BB_NUMBER_THREADS = "2"
+    PARALLEL_MAKE = "-j 2"

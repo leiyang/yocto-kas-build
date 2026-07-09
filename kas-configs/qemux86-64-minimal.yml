@@ -1,0 +1,32 @@
+# Example 1: minimal, self-contained kas config.
+# Builds core-image-minimal for QEMU x86-64 straight from upstream poky, no
+# extra layers. Good smoke-test config to prove the pipeline works end to end.
+#
+# Run directly (outside Jenkins) via:
+#   ./scripts/build.sh qemux86-64-minimal.yml
+header:
+  version: 14
+
+machine: qemux86-64
+distro: poky
+target: core-image-minimal
+
+repos:
+  poky:
+    url: https://git.yoctoproject.org/poky
+    branch: kirkstone
+    layers:
+      meta:
+      meta-poky:
+      meta-yocto-bsp:
+
+local_conf_header:
+  standard: |
+    PACKAGE_CLASSES = "package_ipk"
+    EXTRA_IMAGE_FEATURES = "debug-tweaks"
+  parallelism: |
+    # Cap bitbake's own internal parallelism at 2 (not Jenkins job
+    # concurrency) — keeps a single build from over-subscribing the host,
+    # especially when multiple Jenkins workers share this one machine.
+    BB_NUMBER_THREADS = "2"
+    PARALLEL_MAKE = "-j 2"

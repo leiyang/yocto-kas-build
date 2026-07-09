@@ -1,0 +1,24 @@
+# Example 2: layered kas config using `includes` + an extra BSP layer.
+# Same product target as base.yml, but adds meta-raspberrypi and overrides
+# `machine`. This is the pattern to copy for a new board/product: write a
+# small file that includes base.yml and adds only what's different.
+#
+# Run directly (outside Jenkins) via:
+#   ./scripts/build.sh raspberrypi4-64.yml
+header:
+  version: 14
+  includes:
+    - base.yml
+
+machine: raspberrypi4-64
+
+repos:
+  meta-raspberrypi:
+    url: https://git.yoctoproject.org/meta-raspberrypi
+    branch: kirkstone
+    layers:
+      .:
+
+local_conf_header:
+  rpi: |
+    ENABLE_UART = "1"

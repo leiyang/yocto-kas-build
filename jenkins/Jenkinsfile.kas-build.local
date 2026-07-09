@@ -1,0 +1,85 @@
+// Local-image variant — no AWS/ECR dependency, no registry at all. Assumes
+// the yocto-builder image is already built on the agent's local Docker
+// daemon (via `docker build` — see README.md), and never pulls, pushes, or
+// logs in to any registry. See Jenkinsfile.kas-build.ecr for the AWS
+// ECR-specific version.
+//
+// Runs `kas build` inside the pre-built yocto-builder image against a
+// kas-configs/*.yml chosen from a dropdown. This job never builds or
+// pushes the builder image itself.
+//
+// sstate-cache and downloads are bind-mounted from a fixed host path
+// (cache_root below) and shared across every kas_file choice — see
+// README.md "Cache strategy" for why that's safe.
+//
+// Agent requirement: whichever label agent_label selects must have docker
+// installed, and cache_root pre-created + writable by UID/GID 1000 (the
+// image's `builder` user). Defaults to 'docker', the label shared by every
+// worker configured for this pipeline (see jenkins-setup's
+// WORKER_N_LABELS) — pass a specific worker's own label (e.g. 'worker-1')
+// to pin a build to one machine, e.g. to keep sstate/downloads warm there.
+pipeline {
+    agent { label "${params.agent_label}" }
+
+    parameters {
+        // NOTE: keep this choice list in sync with kas-configs/*.yml.
+        // base.yml is intentionally excluded — it has no `machine:` set and
+        // is only meant to be pulled in via `includes`, not built directly.
+        choice(
+            name: 'kas_file',
+            choices: ['qemux86-64-bash-only.yml', 'qemux86-64-minimal.yml', 'raspberrypi4-64.yml'],
+            description: 'Which kas-configs/*.yml to build'
+        )
+        string(name: 'agent_label', defaultValue: 'docker', description: 'Jenkins agent label to build on (e.g. docker, worker-1, worker-2)')
+        string(name: 'image', defaultValue: 'yocto-builder:latest', description: 'Image ref, must already be docker-built on the agent (see README.md)')
+        string(name: 'cache_root', defaultValue: '/data/yocto-cache', description: 'Host path for shared sstate/downloads (must pre-exist)')
+    }
+
+    options {
+        timestamps()
+        // Concurrent builds of this job are allowed on purpose: sstate/
+        // downloads sharing is safe (Yocto locks its own dirs) and build/
+        // output dirs are keyed per kas_file below, so two people (or two
+        // kas_file choices) submitting around the same time each get their
+        // own run instead of one silently aborting the other's build.
+    }
+
+    stages {
+        stage('Prepare') {
+            steps {
+                script {
+                    env.BUILD_OUT_DIR = "${env.WORKSPACE}/build/${params.kas_file.replace('.yml','')}"
+                }
+                sh '''
+                    set -euo pipefail
+                    mkdir -p "${cache_root}/downloads" "${cache_root}/sstate" "${BUILD_OUT_DIR}"
+                '''
+            }
+        }
+
+        stage('Build') {
+            steps {
+                sh '''
+                    set -euo pipefail
+                    docker run --rm \
+                        -v "${WORKSPACE}/kas-configs:/kas-work/kas-configs:ro" \
+                        -v "${BUILD_OUT_DIR}:/kas-work/build" \
+                        -v "${cache_root}/downloads:/kas-work/downloads" \
+                        -v "${cache_root}/sstate:/kas-work/sstate" \
+                        -e "DL_DIR=/kas-work/downloads" \
+                        -e "SSTATE_DIR=/kas-work/sstate" \
+                        -e "KAS_WORK_DIR=/kas-work" \
+                        -e "KAS_BUILD_DIR=/kas-work/build" \
+                        "${image}" \
+                        build "kas-configs/${kas_file}"
+                '''
+            }
+        }
+    }
+
+    post {
+        always {
+            archiveArtifacts artifacts: "build/${params.kas_file.replace('.yml','')}/tmp/deploy/images/**/*.wic*,build/${params.kas_file.replace('.yml','')}/tmp/deploy/images/**/*.ext4*,build/${params.kas_file.replace('.yml','')}/tmp/deploy/images/**/*.manifest", allowEmptyArchive: true, fingerprint: true
+        }
+    }
+}

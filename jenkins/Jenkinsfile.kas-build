@@ -23,21 +23,32 @@ pipeline {
         stage('Prepare') {
             steps {
                 script {
-                    env.CACHE_ROOT = params.cache_root
-                    env.KAS_FILE = params.kas_file
-                    env.IMAGE = params.image
                     env.BUILD_OUT_DIR = "${env.WORKSPACE}/build/${params.kas_file.replace('.yml', '')}"
                 }
-                sh '''
+                withEnv([
+                    "CACHE_ROOT=${params.cache_root}",
+                    "BUILD_OUT_DIR=${env.BUILD_OUT_DIR}"
+                ]) {
+                sh '''#!/usr/bin/env bash
                     set -euo pipefail
                     mkdir -p "${CACHE_ROOT}/downloads" "${CACHE_ROOT}/sstate" "${BUILD_OUT_DIR}"
                 '''
+                }
             }
         }
 
         stage('Build') {
             steps {
-                sh '''
+                script {
+                    env.BUILD_OUT_DIR = "${env.WORKSPACE}/build/${params.kas_file.replace('.yml', '')}"
+                }
+                withEnv([
+                    "CACHE_ROOT=${params.cache_root}",
+                    "KAS_FILE=${params.kas_file}",
+                    "IMAGE=${params.image}",
+                    "BUILD_OUT_DIR=${env.BUILD_OUT_DIR}"
+                ]) {
+                sh '''#!/usr/bin/env bash
                     set -euo pipefail
                     docker run --rm \
                         -v "${WORKSPACE}:/kas-work" \
@@ -50,6 +61,7 @@ pipeline {
                         "${IMAGE}" \
                         build "kas-configs/${KAS_FILE}"
                 '''
+                }
             }
         }
     }
